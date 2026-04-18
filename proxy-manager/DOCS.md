@@ -1,4 +1,4 @@
-# Home Assistant Community Add-on: Nginx Proxy Manager
+# Nginx Proxy Manager — Home Assistant Add-on
 
 This add-on enables you to easily forward incoming connections to anywhere,
 including free SSL, without having to know too much about Nginx
@@ -19,64 +19,49 @@ Nginx proxy manager by providing additional Nginx directives.
 The installation of this add-on is pretty straightforward and not different in
 comparison to installing any other Home Assistant add-on.
 
-1. Click the Home Assistant My button below to open the add-on on your Home
-   Assistant instance.
-
-   [![Open this add-on in your Home Assistant instance.][addon-badge]][addon]
-
-1. Click the "Install" button to install the add-on.
-1. Start the "Nginx Proxy Manager" add-on
-1. Check the logs of the "Nginx Proxy Manager" add-on to see if everything went well.
-1. Click the "OPEN WEB UI" button and login using:
+1. In Home Assistant: **Settings → Add-ons → Add-on Store → ⋮ → Repositories**
+2. Add: `https://github.com/konstantinekimovskii/addon-nginx-proxy-manager`
+3. Install **Nginx Proxy Manager**
+4. Start the add‑on and check logs for any issues.
+5. Open Web UI (port 81) and login with:
    `admin@example.com` / `changeme`
-1. Forward port `443` (and optionally `80`) from your router to your
-   Home Assistant machine.
-1. Enjoy the add-on!
+6. Forward ports `80` and `443` from your router to your Home Assistant machine.
+7. Enjoy the add‑on!
 
 ## Configuration
 
-This add-on does not provide any configuration.
+This add‑on does not provide any configuration.
 
 ## Changelog & Releases
 
-This repository keeps a change log using [GitHub's releases][releases]
-functionality.
+See [CHANGELOG.md](../CHANGELOG.md) for detailed release notes.
 
 Releases are based on [Semantic Versioning][semver], and use the format
-of `MAJOR.MINOR.PATCH`. In a nutshell, the version will be incremented
-based on the following:
+`MAJOR.MINOR.PATCH`. In a nutshell:
 
 - `MAJOR`: Incompatible or major changes.
-- `MINOR`: Backwards-compatible new features and enhancements.
-- `PATCH`: Backwards-compatible bugfixes and package updates.
+- `MINOR`: Backwards‑compatible new features and enhancements.
+- `PATCH`: Backwards‑compatible bugfixes and package updates.
 
 ## Support
 
 Got questions?
 
-You have several options to get them answered:
-
-- The [Home Assistant Community Add-ons Discord chat server][discord] for add-on
-  support and feature requests.
-- The [Home Assistant Discord chat server][discord-ha] for general Home
-  Assistant discussions and questions.
-- The Home Assistant [Community Forum][forum].
-- Join the [Reddit subreddit][reddit] in [/r/homeassistant][reddit]
-
-You could also [open an issue here][issue] GitHub.
+- Open an [issue on GitHub][issue].
+- Check the [Home Assistant Community Forum][forum] (original add‑on thread).
 
 ## Authors & contributors
 
-The original setup of this repository is by [Franck Nijhof][frenck].
+Original add‑on by [Franck Nijhof][frenck].
 
-For a full list of all authors and contributors,
-check [the contributor's page][contributors].
+Fork maintained by [Konstantin Ekimovskii][konstantinekimovskii].
 
 ## License
 
 MIT License
 
-Copyright (c) 2019-2025 Franck Nijhof
+Copyright (c) 2019‑2025 Franck Nijhof (original work)
+Copyright (c) 2026 Konstantin Ekimovskii (fork modifications)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -97,13 +82,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 [addon-badge]: https://my.home-assistant.io/badges/supervisor_addon.svg
-[addon]: https://my.home-assistant.io/redirect/supervisor_addon/?addon=a0d7b954_nginxproxymanager&repository_url=https%3A%2F%2Fgithub.com%2Fhassio-addons%2Frepository
-[contributors]: https://github.com/hassio-addons/addon-nginx-proxy-manager/graphs/contributors
-[discord-ha]: https://discord.gg/c5DvZ4e
-[discord]: https://discord.me/hassioaddons
+[addon]: https://my.home-assistant.io/redirect/supervisor_addon/?addon=a0d7b954_nginxproxymanager&repository_url=https%3A%2F%2Fgithub.com%2Fkonstantinekimovskii%2Faddon-nginx-proxy-manager
 [forum]: https://community.home-assistant.io/t/home-assistant-community-add-on-nginx-proxy-manager/111830?u=frenck
 [frenck]: https://github.com/frenck
-[issue]: https://github.com/hassio-addons/addon-nginx-proxy-manager/issues
-[reddit]: https://reddit.com/r/homeassistant
-[releases]: https://github.com/hassio-addons/addon-nginx-proxy-manager/releases
+[issue]: https://github.com/konstantinekimovskii/addon-nginx-proxy-manager/issues
+[konstantinekimovskii]: https://github.com/konstantinekimovskii
 [semver]: https://semver.org/spec/v2.0.0.html

@@ -29,6 +29,10 @@ ln -s /tmp/nginx /var/tmp/nginx
 ln -s /tmp/nginx /var/lib/nginx/tmp
 ln -s /config /opt/nginx-proxy-manager/config
 
+# Ensure /data/logs exists and points to /config/logs for compatibility
+mkdir -p /data
+ln -sf /config/logs /data/logs
+
 ln -sf /config/letsencrypt /etc/letsencrypt
 
 # NGinx needs this file to be able to start.

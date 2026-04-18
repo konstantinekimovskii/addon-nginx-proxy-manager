@@ -1,5 +1,5 @@
-ARG BUILD_FROM=ghcr.io/hassio-addons/base:18.2.0
-# hadolint ignore=DL3006
+ARG BUILD_FROM=ghcr.io/hassio-addons/base:20.0.4
+
 FROM ${BUILD_FROM}
 
 # Required for webpack config of NPM with Node.js 22
@@ -8,33 +8,30 @@ ENV NODE_OPTIONS="--openssl-legacy-provider"
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Copy patches
-COPY patches/*.patch /usr/src/
-
 # Setup base
-ARG NGINX_PROXY_MANAGER_VERSION="v2.12.4"
-# hadolint ignore=DL3003,DL3042
+ARG NGINX_PROXY_MANAGER_VERSION="v2.14.0"
+
+# hadolint ignore=DL3003
 RUN \
     apk add --no-cache --virtual .build-dependencies \
         build-base=0.5-r3 \
-        git=2.49.1-r0 \
-        libffi-dev=3.4.8-r0 \
-        openssl-dev=3.5.4-r0 \
-        patch=2.8-r0 \
-        python3-dev=3.12.12-r0 \
+        git=2.52.0-r0 \
+        libffi-dev=3.5.2-r0 \
+        openssl-dev=3.5.6-r0 \
+        python3-dev=3.12.13-r0 \
     \
     && apk add --no-cache \
-        apache2-utils=2.4.65-r0 \
-        certbot=4.0.0-r0 \
-        libcap=2.76-r0 \
-        logrotate=3.21.0-r1 \
-        nginx-mod-stream=1.28.0-r3 \
-        nginx=1.28.0-r3 \
-        nodejs=22.16.0-r2 \
-        npm=11.3.0-r1 \
-        openssl=3.5.4-r0 \
-        py3-pip=25.1.1-r0 \
-        python3=3.12.12-r0 \
+        apache2-utils=2.4.66-r0 \
+        certbot=5.1.0-r0 \
+        libcap=2.78-r0 \
+        logrotate=3.22.0-r0 \
+        nginx-mod-stream=1.28.3-r0 \
+        nginx=1.28.3-r0 \
+        nodejs=24.14.1-r0 \
+        npm=11.11.0-r0 \
+        openssl=3.5.6-r0 \
+        py3-pip=25.1.1-r1 \
+        python3=3.12.13-r0 \
         yarn=1.22.22-r1 \
     \
     && yarn global add modclean \
@@ -46,12 +43,85 @@ RUN \
         /tmp/nginxproxymanager.tar.gz \
         --strip 1 -C /app \
     \
-    && for i in /usr/src/*.patch; do \
-        patch -d /app -p 1 < "${i}"; done \
+    && cd /app \
+    \
+    && echo "--- Patch 1: /data -> /config in JS files ---" \
+    && sed -i "s|/data/access/|/config/access/|g" backend/internal/access-list.js \
+    && sed -i "s|/data/custom_ssl/|/config/custom_ssl/|g" backend/internal/certificate.js \
+    && sed -i "s|/data/letsencrypt-acme-challenge/|/config/letsencrypt-acme-challenge/|g" backend/internal/certificate.js \
+    && sed -i "s|/data/nginx/|/config/nginx/|g" backend/internal/nginx.js \
+    && sed -i "s|/data/nginx/default_www/|/config/nginx/default_www/|g" backend/internal/setting.js \
+    && sed -i "s|/data/keys.json|/config/keys.json|g" backend/lib/config.js \
+    && sed -i "s|/data/database.sqlite|/config/database.sqlite|g" backend/lib/config.js \
+    \
+    && echo "--- Patch 1: /data -> /config in nginx templates ---" \
+    && find backend/templates -name "*.conf" -exec sed -i "s|/data/|/config/|g" {} \; \
+    \
+    && echo "--- Patch 1: /data -> /config in nginx rootfs ---" \
+    && sed -i "1s|^|load_module /usr/lib/nginx/modules/ngx_stream_module.so;\n|" \
+        docker/rootfs/etc/nginx/nginx.conf \
+    && sed -i "s|/data/logs/|/config/logs/|g" docker/rootfs/etc/nginx/conf.d/default.conf \
+    && sed -i "s|/data/letsencrypt-acme-challenge|/config/letsencrypt-acme-challenge|g" \
+        docker/rootfs/etc/nginx/conf.d/include/letsencrypt-acme-challenge.conf \
+    && sed -i "s|/data/logs/fallback_access.log|/config/logs/fallback_access.log|g" \
+        docker/rootfs/etc/nginx/conf.d/include/log-proxy.conf \
+    && sed -i "s|/data/logs/fallback_http_access.log|/config/logs/fallback_http_access.log|g" \
+        docker/rootfs/etc/nginx/conf.d/include/log-proxy.conf \
+    && sed -i "s|/data/logs/fallback_http_access.log|/config/logs/fallback_http_access.log|g" \
+        docker/rootfs/etc/nginx/conf.d/default.conf \
+    && sed -i "s|/data/logs/fallback_http_error.log|/config/logs/fallback_http_error.log|g" \
+        docker/rootfs/etc/nginx/conf.d/default.conf \
+    && sed -i \
+        -e "s|/data/logs/|/config/logs/|g" \
+        -e "s|/data/nginx/|/config/nginx/|g" \
+        -e "s|/var/lib/nginx/cache/|/tmp/nginx/cache/|g" \
+        docker/rootfs/etc/nginx/nginx.conf \
+    && sed -i "s|/data/acme-registration.json|/config/acme-registration.json|g" \
+        backend/certbot/dns-plugins.json \
+    \
+    && echo "--- Patch 2: redirect logs to stdout ---" \
+    && find backend/templates -name "*.conf" \
+        -exec sed -i \
+            -e "s|access_log /config/logs/[^ {]*{{[^}]*}}[^ ]* \(.*\);|access_log /proc/1/fd/1 \1;|g" \
+            -e "s|error_log /config/logs/[^ {]*{{[^}]*}}[^ ]* \(.*\);|error_log /proc/1/fd/1 \1;|g" \
+            -e "s|access_log /config/logs/[^ ]* \(.*\);|access_log /proc/1/fd/1 \1;|g" \
+            -e "s|error_log /config/logs/[^ ]* \(.*\);|error_log /proc/1/fd/1 \1;|g" \
+        {} \; \
+    && sed -i \
+        -e "s|access_log /config/logs/[^ ]* \(.*\);|access_log /proc/1/fd/1 \1;|g" \
+        -e "s|error_log /config/logs/[^ ]* \(.*\);|error_log /proc/1/fd/1 \1;|g" \
+        docker/rootfs/etc/nginx/conf.d/default.conf \
+    && sed -i "s|access_log /config/logs/fallback_access.log proxy;|access_log /proc/1/fd/1 proxy;|g" \
+        docker/rootfs/etc/nginx/conf.d/include/log-proxy.conf \
+    && sed -i "s|access_log /config/logs/fallback_http_access.log proxy;|access_log /proc/1/fd/1 proxy;|g" \
+        docker/rootfs/etc/nginx/conf.d/include/log-proxy.conf \
+    && sed -i "s|error_log /config/logs/fallback_error.log warn;|error_log /proc/1/fd/1 warn;|g" \
+        docker/rootfs/etc/nginx/nginx.conf \
+    && sed -i "s|error_log /config/logs/fallback_http_error.log warn;|error_log /proc/1/fd/1 warn;|g" \
+        docker/rootfs/etc/nginx/conf.d/default.conf \
+    \
+    && echo "--- Patch 3: certbot pip without venv ---" \
+    && sed -i \
+        "s|. /opt/certbot/bin/activate && pip install --no-cache-dir \(.*\) && deactivate|pip install \1|g" \
+        backend/lib/certbot.js \
+    \
+    && echo "--- Patch 6: cloudflare without version pin ---" \
+    && sed -i "s|\"cloudflare==4.0\.\* |\"cloudflare |g" backend/certbot/dns-plugins.json \
+    \
+    && echo "--- Patch 7: fix locale lang symlink ---" \
+    && ln -s /app/frontend/src/locale/src /app/frontend/src/locale/lang \
+    && echo "--- Patch 8: disable vite-plugin-checker typescript ---" \
+    && sed -i 's|"build": "tsc && vite build|"build": "vite build|g' frontend/package.json \
+    && sed -i 's|typescript: true|typescript: false|g' frontend/vite.config.ts \
+    && echo "--- Patch 9: update frontend version to match NPM ---" \
+    && sed -i "s|\"version\": \"2\\.0\\.0\"|\"version\": \"${NGINX_PROXY_MANAGER_VERSION#v}\"|" frontend/package.json \
+    && echo "--- Patch 10: update backend version to match NPM ---" \
+    && sed -i "s|\"version\": \"2\\.0\\.0\"|\"version\": \"${NGINX_PROXY_MANAGER_VERSION#v}\"|" backend/package.json \
     \
     && cd /app/frontend \
     && yarn install --ignore-engines --network-timeout 100000 \
-    && yarn build --ignore-engines \
+    && yarn locale-compile \
+    && yarn build \
     && rm -rf node_modules \
     \
     && mkdir -p /opt/nginx-proxy-manager/frontend \
@@ -61,8 +131,6 @@ RUN \
     && yarn install \
     && rm -rf node_modules \
     && cp -r /app/backend/. /opt/nginx-proxy-manager/ \
-    \
-    && cp -R /app/global/. /opt/nginx-proxy-manager/global/ \
     \
     && cd /opt/nginx-proxy-manager \
     && yarn install \
@@ -74,6 +142,7 @@ RUN \
     && rm -f /etc/nginx/conf.d/dev.conf \
     \
     && cp /app/docker/rootfs/etc/letsencrypt.ini /etc \
+    && sed -i 's/^\(\s*\)su npm npm/\1su root root/' /app/docker/rootfs/etc/logrotate.d/nginx-proxy-manager \
     && cp /app/docker/rootfs/etc/logrotate.d/nginx-proxy-manager /etc/logrotate.d \
     \
     && sed -i "s#user npm;#user root;#" /etc/nginx/nginx.conf \
@@ -131,11 +200,11 @@ LABEL \
     io.hass.arch="${BUILD_ARCH}" \
     io.hass.type="addon" \
     io.hass.version=${BUILD_VERSION} \
-    maintainer="Franck Nijhof <frenck@addons.community>" \
+    maintainer="Konstantin Ekimovskii" \
     org.opencontainers.image.title="${BUILD_NAME}" \
     org.opencontainers.image.description="${BUILD_DESCRIPTION}" \
-    org.opencontainers.image.vendor="Home Assistant Community Add-ons" \
-    org.opencontainers.image.authors="Franck Nijhof <frenck@addons.community>" \
+    org.opencontainers.image.vendor="Konstantin Ekimovskii" \
+    org.opencontainers.image.authors="Konstantin Ekimovskii" \
     org.opencontainers.image.licenses="MIT" \
     org.opencontainers.image.url="https://addons.community" \
     org.opencontainers.image.source="https://github.com/${BUILD_REPOSITORY}" \
