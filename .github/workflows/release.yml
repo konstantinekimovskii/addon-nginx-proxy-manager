@@ -39,7 +39,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [aarch64, amd64]
+        include:
+          - arch: aarch64
+            platform: linux/arm64
+          - arch: amd64
+            platform: linux/amd64
       fail-fast: false
     permissions:
       packages: write
@@ -65,6 +69,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: proxy-manager
+          platforms: ${{ matrix.platform }}
           push: true
           tags: |
             ${{ env.REGISTRY }}/konstantinekimovskii/${{ matrix.arch }}-addon-nginxproxymanager:${{ needs.validate.outputs.version }}
@@ -92,9 +97,30 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Extract release notes
+        run: |
+          python3 -c "
+          import re
+          ver = '${{ needs.validate.outputs.version }}'
+          with open('proxy-manager/CHANGELOG.md') as f:
+            content = f.read()
+          # Берём блок от ## с текущей версией до следующего ## или конца
+          pattern = r'##\s*' + re.escape(ver) + r'\s*\([^)]+\)\n(.+?)(?=\n##\s|\Z)'
+          m = re.search(pattern, content, re.DOTALL)
+          if m:
+            notes = m.group(0).strip()
+            with open('release-notes.md', 'w') as out:
+              out.write(notes + '\n')
+            print(f'Extracted release notes for {ver}')
+          else:
+            print(f'Version {ver} not found in CHANGELOG.md, falling back to full')
+            with open('release-notes.md', 'w') as out:
+              out.write(content)
+          "
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: Nginx Proxy Manager v${{ needs.validate.outputs.version }}
-          body_path: proxy-manager/CHANGELOG.md
+          body_path: release-notes.md
           make_latest: true
