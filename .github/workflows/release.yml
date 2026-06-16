@@ -72,8 +72,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ${{ env.REGISTRY }}/konstantinekimovskii/${{ matrix.arch }}-addon-nginxproxymanager:${{ needs.validate.outputs.version }}
-            ${{ env.REGISTRY }}/konstantinekimovskii/${{ matrix.arch }}-addon-nginxproxymanager:latest
+            ${{ env.REGISTRY }}/konstantinekimovskii/addon-nginx-proxy-manager/${{ matrix.arch }}-addon-nginx-proxy-manager:${{ needs.validate.outputs.version }}
+            ${{ env.REGISTRY }}/konstantinekimovskii/addon-nginx-proxy-manager/${{ matrix.arch }}-addon-nginx-proxy-manager:latest
           build-args: |
             BUILD_FROM=ghcr.io/hassio-addons/base:21.0.0
             BUILD_ARCH=${{ matrix.arch }}
