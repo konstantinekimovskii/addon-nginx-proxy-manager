@@ -1,40 +1,36 @@
-ARG BUILD_FROM=ghcr.io/hassio-addons/base:20.0.4
+ARG BUILD_FROM=ghcr.io/hassio-addons/base:21.0.0
 
 FROM ${BUILD_FROM}
-
-# Required for webpack config of NPM with Node.js 22
-ENV NODE_OPTIONS="--openssl-legacy-provider"
 
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Setup base
-ARG NGINX_PROXY_MANAGER_VERSION="v2.14.0"
+ARG NGINX_PROXY_MANAGER_VERSION="v2.15.1"
 
 # hadolint ignore=DL3003
+COPY scripts/patch-npm.py /tmp/patch-npm.py
 RUN \
-    apk add --no-cache --virtual .build-dependencies \
-        build-base=0.5-r3 \
-        git=2.52.0-r0 \
-        libffi-dev=3.5.2-r0 \
-        openssl-dev=3.5.6-r0 \
-        python3-dev=3.12.13-r0 \
+    apk add --no-cache --upgrade libcrypto3 libssl3 openssl openssl-dev certbot \
     \
     && apk add --no-cache \
-        apache2-utils=2.4.66-r0 \
-        certbot=5.1.0-r0 \
+        apache2-utils=2.4.67-r0 \
         libcap=2.78-r0 \
         logrotate=3.22.0-r0 \
-        nginx-mod-stream=1.28.3-r0 \
-        nginx=1.28.3-r0 \
-        nodejs=24.14.1-r0 \
-        npm=11.11.0-r0 \
-        openssl=3.5.6-r0 \
-        py3-pip=25.1.1-r1 \
-        python3=3.12.13-r0 \
+        nginx-mod-stream=1.30.2-r1 \
+        nginx=1.30.2-r1 \
+        nodejs=24.16.0-r0 \
+        npm=11.12.1-r0 \
+        py3-pip=26.1.2-r0 \
+        python3=3.14.5-r0 \
         yarn=1.22.22-r1 \
     \
-    && yarn global add modclean \
+    && apk add --no-cache --virtual .build-dependencies \
+        build-base=0.5-r4 \
+        git=2.54.0-r0 \
+        libffi-dev=3.5.2-r1 \
+        python3-dev=3.14.5-r0 \
+    \
     \
     && curl -J -L -o /tmp/nginxproxymanager.tar.gz \
         "https://github.com/NginxProxyManager/nginx-proxy-manager/archive/${NGINX_PROXY_MANAGER_VERSION}.tar.gz" \
@@ -45,78 +41,7 @@ RUN \
     \
     && cd /app \
     \
-    && echo "--- Patch 1: /data -> /config in JS files ---" \
-    && sed -i "s|/data/access/|/config/access/|g" backend/internal/access-list.js \
-    && sed -i "s|/data/custom_ssl/|/config/custom_ssl/|g" backend/internal/certificate.js \
-    && sed -i "s|/data/letsencrypt-acme-challenge/|/config/letsencrypt-acme-challenge/|g" backend/internal/certificate.js \
-    && sed -i "s|/data/nginx/|/config/nginx/|g" backend/internal/nginx.js \
-    && sed -i "s|/data/nginx/default_www/|/config/nginx/default_www/|g" backend/internal/setting.js \
-    && sed -i "s|/data/keys.json|/config/keys.json|g" backend/lib/config.js \
-    && sed -i "s|/data/database.sqlite|/config/database.sqlite|g" backend/lib/config.js \
-    \
-    && echo "--- Patch 1: /data -> /config in nginx templates ---" \
-    && find backend/templates -name "*.conf" -exec sed -i "s|/data/|/config/|g" {} \; \
-    \
-    && echo "--- Patch 1: /data -> /config in nginx rootfs ---" \
-    && sed -i "1s|^|load_module /usr/lib/nginx/modules/ngx_stream_module.so;\n|" \
-        docker/rootfs/etc/nginx/nginx.conf \
-    && sed -i "s|/data/logs/|/config/logs/|g" docker/rootfs/etc/nginx/conf.d/default.conf \
-    && sed -i "s|/data/letsencrypt-acme-challenge|/config/letsencrypt-acme-challenge|g" \
-        docker/rootfs/etc/nginx/conf.d/include/letsencrypt-acme-challenge.conf \
-    && sed -i "s|/data/logs/fallback_access.log|/config/logs/fallback_access.log|g" \
-        docker/rootfs/etc/nginx/conf.d/include/log-proxy.conf \
-    && sed -i "s|/data/logs/fallback_http_access.log|/config/logs/fallback_http_access.log|g" \
-        docker/rootfs/etc/nginx/conf.d/include/log-proxy.conf \
-    && sed -i "s|/data/logs/fallback_http_access.log|/config/logs/fallback_http_access.log|g" \
-        docker/rootfs/etc/nginx/conf.d/default.conf \
-    && sed -i "s|/data/logs/fallback_http_error.log|/config/logs/fallback_http_error.log|g" \
-        docker/rootfs/etc/nginx/conf.d/default.conf \
-    && sed -i \
-        -e "s|/data/logs/|/config/logs/|g" \
-        -e "s|/data/nginx/|/config/nginx/|g" \
-        -e "s|/var/lib/nginx/cache/|/tmp/nginx/cache/|g" \
-        docker/rootfs/etc/nginx/nginx.conf \
-    && sed -i "s|/data/acme-registration.json|/config/acme-registration.json|g" \
-        backend/certbot/dns-plugins.json \
-    \
-    && echo "--- Patch 2: redirect logs to stdout ---" \
-    && find backend/templates -name "*.conf" \
-        -exec sed -i \
-            -e "s|access_log /config/logs/[^ {]*{{[^}]*}}[^ ]* \(.*\);|access_log /proc/1/fd/1 \1;|g" \
-            -e "s|error_log /config/logs/[^ {]*{{[^}]*}}[^ ]* \(.*\);|error_log /proc/1/fd/1 \1;|g" \
-            -e "s|access_log /config/logs/[^ ]* \(.*\);|access_log /proc/1/fd/1 \1;|g" \
-            -e "s|error_log /config/logs/[^ ]* \(.*\);|error_log /proc/1/fd/1 \1;|g" \
-        {} \; \
-    && sed -i \
-        -e "s|access_log /config/logs/[^ ]* \(.*\);|access_log /proc/1/fd/1 \1;|g" \
-        -e "s|error_log /config/logs/[^ ]* \(.*\);|error_log /proc/1/fd/1 \1;|g" \
-        docker/rootfs/etc/nginx/conf.d/default.conf \
-    && sed -i "s|access_log /config/logs/fallback_access.log proxy;|access_log /proc/1/fd/1 proxy;|g" \
-        docker/rootfs/etc/nginx/conf.d/include/log-proxy.conf \
-    && sed -i "s|access_log /config/logs/fallback_http_access.log proxy;|access_log /proc/1/fd/1 proxy;|g" \
-        docker/rootfs/etc/nginx/conf.d/include/log-proxy.conf \
-    && sed -i "s|error_log /config/logs/fallback_error.log warn;|error_log /proc/1/fd/1 warn;|g" \
-        docker/rootfs/etc/nginx/nginx.conf \
-    && sed -i "s|error_log /config/logs/fallback_http_error.log warn;|error_log /proc/1/fd/1 warn;|g" \
-        docker/rootfs/etc/nginx/conf.d/default.conf \
-    \
-    && echo "--- Patch 3: certbot pip without venv ---" \
-    && sed -i \
-        "s|. /opt/certbot/bin/activate && pip install --no-cache-dir \(.*\) && deactivate|pip install \1|g" \
-        backend/lib/certbot.js \
-    \
-    && echo "--- Patch 6: cloudflare without version pin ---" \
-    && sed -i "s|\"cloudflare==4.0\.\* |\"cloudflare |g" backend/certbot/dns-plugins.json \
-    \
-    && echo "--- Patch 7: fix locale lang symlink ---" \
-    && ln -s /app/frontend/src/locale/src /app/frontend/src/locale/lang \
-    && echo "--- Patch 8: disable vite-plugin-checker typescript ---" \
-    && sed -i 's|"build": "tsc && vite build|"build": "vite build|g' frontend/package.json \
-    && sed -i 's|typescript: true|typescript: false|g' frontend/vite.config.ts \
-    && echo "--- Patch 9: update frontend version to match NPM ---" \
-    && sed -i "s|\"version\": \"2\\.0\\.0\"|\"version\": \"${NGINX_PROXY_MANAGER_VERSION#v}\"|" frontend/package.json \
-    && echo "--- Patch 10: update backend version to match NPM ---" \
-    && sed -i "s|\"version\": \"2\\.0\\.0\"|\"version\": \"${NGINX_PROXY_MANAGER_VERSION#v}\"|" backend/package.json \
+    && python3 /tmp/patch-npm.py --dir /app \
     \
     && cd /app/frontend \
     && yarn install --ignore-engines --network-timeout 100000 \
@@ -141,26 +66,12 @@ RUN \
     && cp -r /app/docker/rootfs/etc/nginx /etc/nginx \
     && rm -f /etc/nginx/conf.d/dev.conf \
     \
-    && cp /app/docker/rootfs/etc/letsencrypt.ini /etc \
-    && sed -i 's/^\(\s*\)su npm npm/\1su root root/' /app/docker/rootfs/etc/logrotate.d/nginx-proxy-manager \
     && cp /app/docker/rootfs/etc/logrotate.d/nginx-proxy-manager /etc/logrotate.d \
-    \
-    && sed -i "s#user npm;#user root;#" /etc/nginx/nginx.conf \
-    && sed -i "s#root /app/frontend;#root /opt/nginx-proxy-manager/frontend;#" \
-        /etc/nginx/conf.d/production.conf \
-    && sed -i "s#table.string('id').notNull().primary();#table.string('id', 32).notNull().primary();#" \
-        /opt/nginx-proxy-manager/migrations/20190227065017_settings.js \
     \
     && mkdir -p \
         /run/nginx \
     \
-    && modclean \
-        --path /opt/nginx-proxy-manager \
-        --no-progress \
-        --keep-empty \
-        --run \
-    \
-    && yarn global remove modclean \
+    && npx --yes clean-modules --yes --no-defaults --keep-empty --directory /opt/nginx-proxy-manager \
     && yarn cache clean \
     \
     && apk del --purge .build-dependencies \
@@ -172,7 +83,7 @@ RUN \
         /opt/nginx-proxy-manager/node_modules/bcrypt/build \
         /root/.cache \
         /root/.node-gyp \
-        /tmp/.[!.]* \
+        /tmp/.![.]* \
         /tmp/* \
         /usr/lib/node_modules \
         /usr/local/share/.cache \

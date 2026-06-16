@@ -1,9 +1,10 @@
 ---
 name: Nginx Proxy Manager
-version: 2.14.0-r1
+version: 2.15.1-r1
 slug: nginxproxymanager
 description: Manage Nginx proxy hosts with a simple, powerful interface
 url: https://github.com/konstantinekimovskii/addon-nginx-proxy-manager
+image: ghcr.io/konstantinekimovskii/addon-nginx-proxy-manager/{arch}-addon-nginx-proxy-manager
 webui: http://[HOST]:[PORT:81]
 startup: services
 init: false

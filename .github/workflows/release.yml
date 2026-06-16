@@ -1,0 +1,98 @@
+---
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  REGISTRY: ghcr.io
+
+jobs:
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.config.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate tag matches config.yaml
+        id: config
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          CFG_VER=$(python3 -c "import re; m=re.search(r'version:\s*(\S+)', open('proxy-manager/config.yaml').read()); print(m.group(1))")
+          if [ "$TAG" != "$CFG_VER" ]; then
+            echo "::error::Tag v${TAG} does not match config.yaml version ${CFG_VER}"
+            exit 1
+          fi
+          echo "version=${CFG_VER}" >> "$GITHUB_OUTPUT"
+          echo "Tag validated: v${TAG}"
+
+  deploy:
+    name: Deploy ${{ matrix.arch }}
+    needs: [validate]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [aarch64, amd64]
+      fail-fast: false
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: proxy-manager
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/konstantinekimovskii/${{ matrix.arch }}-addon-nginxproxymanager:${{ needs.validate.outputs.version }}
+            ${{ env.REGISTRY }}/konstantinekimovskii/${{ matrix.arch }}-addon-nginxproxymanager:latest
+          build-args: |
+            BUILD_FROM=ghcr.io/hassio-addons/base:21.0.0
+            BUILD_ARCH=${{ matrix.arch }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            BUILD_NAME=Nginx Proxy Manager
+            BUILD_DESCRIPTION=Manage Nginx proxy hosts with a simple, powerful interface
+            BUILD_REF=${{ github.sha }}
+            BUILD_REPOSITORY=${{ github.repository }}
+            BUILD_VERSION=${{ needs.validate.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
+
+  release:
+    name: Create Release
+    needs: [validate, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Nginx Proxy Manager v${{ needs.validate.outputs.version }}
+          body_path: proxy-manager/CHANGELOG.md
+          make_latest: true
