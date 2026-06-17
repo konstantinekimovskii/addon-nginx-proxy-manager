@@ -18,8 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Get NPM version from Dockerfile
+        run: |
+          NPM_VER=$(grep 'NGINX_PROXY_MANAGER_VERSION=' proxy-manager/Dockerfile | sed 's/.*"\(.*\)".*/\1/')
+          echo "NPM_VERSION=${NPM_VER}" >> "$GITHUB_ENV"
+          echo "NPM version: ${NPM_VER}"
+
       - name: Validate patches
-        run: python3 proxy-manager/scripts/patch-npm.py v2.15.1
+        run: python3 proxy-manager/scripts/patch-npm.py ${{ env.NPM_VERSION }}
 
       - name: Validate config.yaml
         run: |

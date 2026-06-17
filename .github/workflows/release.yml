@@ -97,30 +97,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Extract release notes
-        run: |
-          python3 -c "
-          import re
-          ver = '${{ needs.validate.outputs.version }}'
-          with open('proxy-manager/CHANGELOG.md') as f:
-            content = f.read()
-          # Берём блок от ## с текущей версией до следующего ## или конца
-          pattern = r'##\s*' + re.escape(ver) + r'\s*\([^)]+\)\n(.+?)(?=\n##\s|\Z)'
-          m = re.search(pattern, content, re.DOTALL)
-          if m:
-            notes = m.group(0).strip()
-            with open('release-notes.md', 'w') as out:
-              out.write(notes + '\n')
-            print(f'Extracted release notes for {ver}')
-          else:
-            print(f'Version {ver} not found in CHANGELOG.md, falling back to full')
-            with open('release-notes.md', 'w') as out:
-              out.write(content)
-          "
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Nginx Proxy Manager v${{ needs.validate.outputs.version }}
-          body_path: release-notes.md
+          name: v${{ needs.validate.outputs.version }}
+          generate_release_notes: true
           make_latest: true
